@@ -1,0 +1,141 @@
+#!/bin/bash
+
+# Available commands:
+#
+# restic-backups backup <namespace>
+# restic-backups prune <namespace>
+# restic-backups prune_single <hash_snapshot>
+# restic-backups snapshots <namespace>
+# restic-backups restore <namespace> <hash_snapshot> /destination/folder
+
+exclude_programming=/home/iux/Documents/scripts/restic/excludes_programming.txt
+repo_programming=/mnt/Synology/MatiuxHome/Backup/Programming
+host_programming=/home/iux/Documents/Programming
+
+exclude_documents=/home/iux/Documents/scripts/restic/excludes_documents.txt
+repo_documents=/mnt/Synology/MatiuxHome/Backup/Documents
+host_documents=/home/iux/Documents/
+
+PWD_FILE=/home/iux/Documents/scripts/restic/resticp.txt
+KEEP_LAST=10
+CMD=$1
+REPO=repo_$2
+HOST=host_$2
+EXCLUDE="exclude_$2"
+
+backup() {
+
+	# Create a snapshot
+
+	host=${1}
+	repo=${2}
+
+	restic -r $repo \
+		backup \
+		--password-file=$PWD_FILE \
+		--verbose=2 \
+		--exclude-file=${!EXCLUDE} \
+		$host
+}
+
+snapshots() {
+
+	# List snapshots
+
+	repo=${1}
+
+	restic -r $repo \
+		snapshots \
+		--verbose=2 \
+		--password-file=$PWD_FILE
+}
+
+prune() {
+
+	# Delete old snapshots except last ${KEEP_LAST} (deleting data as well)
+
+	repo=${1}
+
+	restic -r $repo \
+		forget \
+		--keep-last ${KEEP_LAST} \
+		--prune \
+		--verbose=2 \
+		--password-file=${PWD_FILE}
+}
+
+prune_single() {
+
+	# Delete a specific snapshot (also deleting the data)
+
+	repo=${1}
+	hash=${2}
+
+	restic -r $repo \
+		forget \
+		--prune $hash \
+		--verbose=2 \
+		--password-file=$PWD_FILE
+}
+
+restore() {
+
+	# Restore a snapshot
+
+	repo=${1}
+	hash=${2}
+	destination=${3}
+
+	restic -r $repo \
+		restore $hash \
+		--target=$destination \
+		--password-file=$PWD_FILE \
+		--verbose=2
+}
+
+restore_latest() {
+
+	# Restore of the last snapshot
+
+	repo=${1}
+	destination=${2}
+
+	restic -r $repo \
+		restore latest \
+		--target=$destination \
+		--password-file=$PWD_FILE \
+		--verbose=2
+}
+
+while :; do
+  case $CMD in
+  backup)
+	backup ${!HOST} ${!REPO}
+    break
+    ;;
+  snapshots)
+	snapshots ${!REPO}
+    break
+    ;;
+  prune)
+	prune ${!REPO}
+    break
+    ;;
+  prune_single)
+	hash=$3
+	prune_single ${!REPO} $hash
+    break
+    ;;
+  restore)
+	hash=$3
+	destination=$4
+	restore ${!REPO} $hash $destination
+    break
+    ;;
+  restore_latest)
+	destination=$3
+	restore_latest ${!REPO} $destination
+    break
+    ;;
+  esac
+done
